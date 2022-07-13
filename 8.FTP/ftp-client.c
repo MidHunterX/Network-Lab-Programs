@@ -1,42 +1,46 @@
-#include <arpa/inet.h>
-#include <fcntl.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
-
 void main() {
-    struct sockaddr_in server_address;
-
-    int socket_descriptor, character_count, file_length, i;
-    char buffer_1[3024], buffer_2[3000];
-
-    socket_descriptor = socket(AF_INET, SOCK_STREAM, 0);
-
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(6000);
-    server_address.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-    connect(socket_descriptor, (struct sockaddr *)&server_address, sizeof(server_address));
-
-    printf("\nEnter the filename:\n");
-    character_count = read(0, buffer_1, sizeof(buffer_1));
-    buffer_1[character_count - 1] = '\0';
-
-    write(socket_descriptor, buffer_1, character_count);
-
-    file_length = read(socket_descriptor, buffer_2, sizeof(buffer_2));
-    if (file_length == 0)
-        printf("\n\nFile not present....!!!");
-    else {
-        printf("\n\nPrinting content of file:\n");
-        for (i = 0; i < file_length; i++)
-            printf("%c", buffer_2[i]);
-
-        printf("\nReceived requested file\n\n");
-    }
-
-    close(socket_descriptor);
+  FILE *fp;
+  int csd, n, ser, s, cli, cport, newsd;
+  char name[100], rcvmsg[100], rcvg[100], fname[100];
+  struct sockaddr_in servaddr;
+  printf("Enter the port");
+  scanf("%d", &cport);
+  csd = socket(AF_INET, SOCK_STREAM, 0);
+  if (csd < 0) {
+    printf("Error....\n");
+    exit(0);
+  } else
+    printf("Socket is created\n");
+  servaddr.sin_family = AF_INET;
+  servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  servaddr.sin_port = htons(cport);
+  if (connect(csd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+    printf("Error in connection\n");
+  else
+    printf("connected\n");
+  printf("Enter the existing file name\t");
+  scanf("%s", name);
+  printf("Enter the new file name\t");
+  scanf("%s", fname);
+  fp = fopen(fname, "w");
+  send(csd, name, sizeof(name), 0);
+  while (1) {
+    s = recv(csd, rcvg, 100, 0);
+    rcvg[s] = '\0';
+    if (strcmp(rcvg, "error") == 0) printf("File is not available\n");
+    if (strcmp(rcvg, "completed") == 0) {
+      printf("File is transferred........\n");
+      fclose(fp);
+      close(csd);
+      break;
+    } else
+      fputs(rcvg, stdout);
+    fprintf(fp, "%s", rcvg);
+  }
 }
