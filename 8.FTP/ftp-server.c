@@ -1,58 +1,50 @@
-#include <arpa/inet.h>
-#include <fcntl.h>
+#include <netinet/in.h>
 #include <stdio.h>
-#include <sys/socket.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-#define BUFSIZE 1024
-#define PORT_ADDR 6000
-#define QSIZE 5
-
 void main() {
-    struct sockaddr_in server_address, client_address;
-
-    int i, socket_descriptor_1, socket_descriptor_2, size_of_client_address, file_descriptor, character_count;
-    char buffer_1[BUFSIZE], buffer_2[BUFSIZE];
-
-    socket_descriptor_1 = socket(AF_INET, SOCK_STREAM, 0);
-
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(PORT_ADDR);
-    server_address.sin_addr.s_addr = htonl(INADDR_ANY);
-
-    bind(socket_descriptor_1, (struct sockaddr *)&server_address, sizeof(server_address));
-    listen(socket_descriptor_1, QSIZE);
-
-    size_of_client_address = sizeof(client_address);
-
-    socket_descriptor_2 = accept(socket_descriptor_1, (struct sockaddr *)&client_address, &size_of_client_address);
-    printf("\nRequest accepted...\n");
-    close(socket_descriptor_1);
-
-    character_count = read(socket_descriptor_2, buffer_1, BUFSIZE);
-    buffer_1[character_count] = '\0';
-    printf("\nFilename is %s", buffer_1);
-
-    if ((file_descriptor = open(buffer_1, O_RDONLY)) >= 0) {
-        printf("\n\nFile opened...");
-
-        character_count = read(file_descriptor, buffer_2, BUFSIZE);
-        while (character_count > 0) {
-            printf("\n\nSending file...");
-            write(socket_descriptor_2, buffer_2, character_count);
-
-            printf("\n\nPrinting content of file:\n");
-            for (i = 0; i < character_count; i++)
-                printf("%c", buffer_2[i]);
-            printf("\n");
-
-            if (i == character_count)
-                break;
-        }
-    } else
-        printf("\n\nRequested file is not present...\n\n");
-
-    close(file_descriptor);
-    close(socket_descriptor_2);
+  FILE *fp;
+  int sd, newsd, ser, n, a, cli, pid, bd, port, clilen;
+  char name[100], fileread[100], fname[100], ch, file[100], rcv[100];
+  struct sockaddr_in servaddr, cliaddr;
+  printf("Enter the port address\n");
+  scanf("%d", &port);
+  sd = socket(AF_INET, SOCK_STREAM, 0);
+  if (sd < 0)
+    printf("Cant create\n");
+  else
+    printf("Socket is created\n");
+  servaddr.sin_family = AF_INET;
+  servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  servaddr.sin_port = htons(port);
+  a = sizeof(servaddr);
+  bd = bind(sd, (struct sockaddr *)&servaddr, a);
+  if (bd < 0)
+    printf("Cant bind\n");
+  else
+    printf("Binded\n");
+  listen(sd, 5);
+  clilen = sizeof(cliaddr);
+  newsd = accept(sd, (struct sockaddr *)&cliaddr, &clilen);
+  if (newsd < 0)
+    printf("Cant accept\n");
+  else
+    printf("Accepted\n");
+  n = recv(newsd, rcv, 100, 0);
+  rcv[n] = '\0';
+  fp = fopen(rcv, "r");
+  if (fp == NULL) {
+    send(newsd, "error", 5, 0);
+    close(newsd);
+  } else {
+    while (fgets(fileread, sizeof(fileread), fp)) {
+      if (send(newsd, fileread, sizeof(fileread), 0) < 0)
+        printf("Can’t send file contents\n");
+      sleep(1);
+    }
+    if (!fgets(fileread, sizeof(fileread), fp))
+      send(newsd, "completed", 999999999, 0);
+  }
 }
